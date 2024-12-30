@@ -4,6 +4,10 @@
   <meta charset="UTF-8" />
   <title>リスキーダイス</title>
   <style>
+    /* 全体を大きめに表示するため、ベースとなるフォントサイズを引き上げ */
+    html {
+      font-size: 20px;
+    }
     body {
       font-family: sans-serif;
       margin: 20px;
@@ -12,19 +16,21 @@
     }
     h1 {
       color: #333;
+      font-size: 2rem; /* 文字を大きめに */
+      margin-bottom: 2rem;
     }
 
-    /* ボタンを押しやすく、大きめにする */
+    /* ボタンをより大きく */
     button {
       cursor: pointer;
-      padding: 15px 30px;
-      font-size: 18px;
-      margin: 10px;
+      padding: 1rem 2rem;
+      font-size: 1.2rem;
+      margin: 1rem;
       border: none;
-      border-radius: 8px;
+      border-radius: 0.5rem;
       transition: background-color 0.3s, transform 0.1s;
     }
-    /* ボタンの配色や操作感をアップ */
+    /* ダイスを振るボタン */
     #rollButton {
       background-color: #009688;
       color: #fff;
@@ -35,6 +41,7 @@
     #rollButton:active {
       transform: scale(0.95);
     }
+    /* リセットボタン */
     #resetButton {
       background-color: #f44336;
       color: #fff;
@@ -46,38 +53,43 @@
       transform: scale(0.95);
     }
 
-    /* サイコロが振られたような演出用の要素 */
+    /* サイコロアニメーション表示用 */
     #diceAnimation {
-      width: 100px;
-      height: 100px;
-      margin: 20px auto;
-      display: none; /* 初期は非表示 */
+      width: 200px;     /* 大きめのサイコロ画像に */
+      height: 200px;
+      margin: 2rem auto;
+      display: none;    /* 初期は非表示 */
       background: url('https://user-images.githubusercontent.com/12163806/255397485-8882bd4c-b72c-40a4-8d01-5094ba57abde.png') 
                   no-repeat center / contain;
     }
-    /* サイコロをグルグル回転させるアニメーション */
+    /* サイコロが転がるようなアニメーション */
     @keyframes rollDice {
-      0%   { transform: rotate(0deg);   }
-      100% { transform: rotate(720deg); }
+      0% {
+        transform: translateX(0) rotateX(0deg) rotateZ(0deg);
+      }
+      100% {
+        /* 横に移動＋3D回転 */
+        transform: translateX(250px) rotateX(720deg) rotateZ(720deg);
+      }
     }
-    /* アニメーション用クラスを付与すると回転開始 */
     .rolling {
-      animation: rollDice 1s ease-in-out infinite;
+      /* 1秒で移動＋回転。その後繰り返さない (forwards で最後の状態を保持) */
+      animation: rollDice 1s ease-in-out forwards;
     }
 
     /* 結果表示エリア */
     #resultArea {
-      margin-top: 20px;
-      font-size: 40px;
+      margin-top: 2rem;
+      font-size: 3rem;      /* 結果をさらに大きく */
       font-weight: bold;
-      min-height: 60px;
+      min-height: 3rem;
       display: flex;
       flex-direction: column;
       align-items: center;
       justify-content: center;
     }
 
-    /* 「大吉」時の派手な演出 */
+    /* 大吉の派手な演出 */
     .daikichi {
       color: gold;
       animation: flashKichi 1.5s infinite;
@@ -97,30 +109,54 @@
       }
     }
 
-    /* 「大凶」時の派手な演出（揺れ＋点滅） */
+    /* 大凶の派手な演出（雷が落ちるようなフラッシュ + 揺れ） */
     .daikyo {
       color: red;
-      animation: shakeKyo 0.7s linear, flashKyoColor 1s infinite alternate;
+      animation: shakeKyo 0.8s linear, flashKyoColor 1s infinite alternate;
     }
     /* 揺れアニメーション */
     @keyframes shakeKyo {
       0%   { transform: translate(0, 0); }
-      20%  { transform: translate(-10px, 0); }
-      40%  { transform: translate(10px, 0); }
-      60%  { transform: translate(-10px, 0); }
-      80%  { transform: translate(10px, 0); }
+      20%  { transform: translate(-15px, 0); }
+      40%  { transform: translate(15px, 0); }
+      60%  { transform: translate(-15px, 0); }
+      80%  { transform: translate(15px, 0); }
       100% { transform: translate(0, 0); }
     }
     /* 点滅アニメーション */
     @keyframes flashKyoColor {
       from { text-shadow: 0 0 10px red; }
-      to   { text-shadow: 0 0 20px black; }
+      to   { text-shadow: 0 0 30px black; }
+    }
+
+    /* 雷のフラッシュ演出用オーバーレイ */
+    #thunderOverlay {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
+      background-color: white;
+      opacity: 0;
+      pointer-events: none; /* マウス操作は透過 */
+      z-index: 9999;        /* 最前面 */
+    }
+    /* 雷のフラッシュを表現 (短時間でパッと光って消える) */
+    @keyframes thunderStrike {
+      0%   { opacity: 0; }
+      25%  { opacity: 1; }
+      50%  { opacity: 0; }
+      75%  { opacity: 1; }
+      100% { opacity: 0; }
+    }
+    .active {
+      animation: thunderStrike 0.8s ease-in-out;
     }
 
     /* 統計表示 */
     #stats {
-      margin-top: 20px;
-      font-size: 16px;
+      margin-top: 2rem;
+      font-size: 1.2rem;
       color: #555;
     }
   </style>
@@ -143,6 +179,9 @@
   <!-- リセットボタン -->
   <button id="resetButton">リセット</button>
 
+  <!-- 雷のフラッシュ演出オーバーレイ -->
+  <div id="thunderOverlay"></div>
+
   <script>
     // 累積カウンタの初期化
     let totalRolls = 0;
@@ -155,29 +194,33 @@
     const resultArea     = document.getElementById('resultArea');
     const statsArea      = document.getElementById('stats');
     const diceAnimation  = document.getElementById('diceAnimation');
+    const thunderOverlay = document.getElementById('thunderOverlay');
 
     // ダイスを振る動作
     function rollRiskyDice() {
       // 1/20の確率で大凶、それ以外は大吉
       const roll = Math.floor(Math.random() * 20) + 1; 
       
-      // 演出：サイコロのアニメーションを表示
-      diceAnimation.style.display = 'block';
-      diceAnimation.classList.add('rolling');
-
       // ボタンを一時的に押せなくする (多重クリック防止)
       rollButton.disabled = true;
 
+      // サイコロのアニメーション開始
+      diceAnimation.style.display = 'block';
+      diceAnimation.classList.add('rolling');
+
       // アニメーションを1秒ほど再生後、結果を表示
       setTimeout(() => {
+        // サイコロアニメーションを非表示に戻す
         diceAnimation.style.display = 'none';
         diceAnimation.classList.remove('rolling');
 
         totalRolls++;
 
+        // 結果の表示
         if (roll === 1) {
           daikyoCount++;
           showResult('大凶', 'daikyo');
+          thunderFlash(); // 雷のフラッシュ演出を追加
         } else {
           daikichiCount++;
           showResult('大吉', 'daikichi');
@@ -196,6 +239,16 @@
       resultArea.textContent = text;
       // 新しいクラスを付与（色とアニメーション）
       resultArea.classList.add(cssClass);
+    }
+
+    // 大凶の雷フラッシュを実行
+    function thunderFlash() {
+      // #thunderOverlay にクラスを付与してアニメーション
+      thunderOverlay.classList.add('active');
+      // アニメーションが終わったらクラスを取り除く
+      setTimeout(() => {
+        thunderOverlay.classList.remove('active');
+      }, 800);
     }
 
     // 累積統計の更新
