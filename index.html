@@ -1,0 +1,149 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <title>リスキーダイス</title>
+  <style>
+    body {
+      font-family: sans-serif;
+      margin: 20px;
+      text-align: center;
+    }
+
+    h1 {
+      color: #333;
+    }
+
+    /* ボタンスタイル */
+    button {
+      cursor: pointer;
+      padding: 10px 20px;
+      font-size: 16px;
+      margin: 10px;
+    }
+
+    /* 結果表示用 */
+    #resultArea {
+      margin-top: 20px;
+      font-size: 36px;
+      font-weight: bold;
+      min-height: 60px; /* 結果テキストがない状態でも高さを確保 */
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+    }
+
+    /* 大吉表示用（点滅の簡易アニメーション） */
+    .daikichi {
+      color: gold;
+      animation: flashKichi 1s infinite alternate;
+    }
+    @keyframes flashKichi {
+      from { text-shadow: 0 0 10px gold; }
+      to   { text-shadow: 0 0 20px orange; }
+    }
+
+    /* 大凶表示用（ちょっと揺れる簡易アニメーション） */
+    .daikyo {
+      color: red;
+      animation: shakeKyo 0.3s linear 0s 2;
+    }
+    @keyframes shakeKyo {
+      0%   { transform: translate(0, 0); }
+      20%  { transform: translate(-10px, 0); }
+      40%  { transform: translate(10px, 0); }
+      60%  { transform: translate(-10px, 0); }
+      80%  { transform: translate(10px, 0); }
+      100% { transform: translate(0, 0); }
+    }
+
+    /* 統計表示 */
+    #stats {
+      margin-top: 20px;
+      font-size: 16px;
+      color: #555;
+    }
+  </style>
+</head>
+<body>
+  <h1>リスキーダイス</h1>
+
+  <!-- リスキーダイスを振るボタン -->
+  <button id="rollButton">リスキーダイスを振る</button>
+
+  <!-- 結果表示エリア -->
+  <div id="resultArea"></div>
+
+  <!-- 統計表示エリア -->
+  <div id="stats"></div>
+
+  <!-- リセットボタン -->
+  <button id="resetButton">リセット</button>
+
+  <script>
+    // 累積カウンタの初期化
+    let totalRolls = 0;
+    let daikichiCount = 0;
+    let daikyoCount   = 0;
+
+    // 結果表示用の要素を取得
+    const resultArea = document.getElementById('resultArea');
+    const statsArea  = document.getElementById('stats');
+
+    // ダイスを振る動作
+    function rollRiskyDice() {
+      // 1/20の確率で大凶、それ以外は大吉
+      const roll = Math.floor(Math.random() * 20) + 1; 
+      // 1～20の値を取得
+      let resultText = '';
+      
+      totalRolls++;
+
+      if (roll === 1) {
+        resultText = '大凶';
+        daikyoCount++;
+        showResult(resultText, 'daikyo');
+      } else {
+        resultText = '大吉';
+        daikichiCount++;
+        showResult(resultText, 'daikichi');
+      }
+
+      updateStats();
+    }
+
+    // 結果の表示・アニメーション付与
+    function showResult(text, cssClass) {
+      // 前のクラスを削除
+      resultArea.classList.remove('daikichi', 'daikyo');
+      resultArea.textContent = text;
+
+      // 新しいクラスを付与（色とアニメーション）
+      resultArea.classList.add(cssClass);
+    }
+
+    // 累積統計の更新
+    function updateStats() {
+      statsArea.textContent = `振った回数: ${totalRolls} 回 | 大吉: ${daikichiCount} 回 | 大凶: ${daikyoCount} 回`;
+    }
+
+    // リセット処理
+    function resetStats() {
+      totalRolls = 0;
+      daikichiCount = 0;
+      daikyoCount = 0;
+      resultArea.textContent = '';
+      resultArea.classList.remove('daikichi', 'daikyo');
+      updateStats();  // 統計表示もリセット
+    }
+
+    // ボタンにイベントリスナーを登録
+    document.getElementById('rollButton').addEventListener('click', rollRiskyDice);
+    document.getElementById('resetButton').addEventListener('click', resetStats);
+
+    // 初期表示(リロードした直後の状態をクリアにしておきたい場合)
+    updateStats();
+  </script>
+</body>
+</html>
