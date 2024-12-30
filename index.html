@@ -2,31 +2,22 @@
 <html lang="ja">
 <head>
   <meta charset="UTF-8" />
-  <title>リスキーダイス</title>
-  <!-- スマホ幅にあわせた表示 -->
+  <title>リスキーダイス (文字ぐるぐる版)</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-
   <style>
-    /* スマホ向けに全体を少し小さめに */
-    html {
-      font-size: 18px; 
-    }
     body {
       font-family: sans-serif;
-      margin: 16px;
+      margin: 20px;
       text-align: center;
-      background-color: #f0f0f0;
-      /* iOS Safariで3Dを使う際にperspectiveを付与 */
-      -webkit-perspective: 1000px;
-              perspective: 1000px;
+      background-color: #fafafa;
     }
     h1 {
+      margin-bottom: 1.2rem;
+      font-size: 1.5rem;
       color: #333;
-      font-size: 1.4rem;
-      margin-bottom: 1rem;
     }
 
-    /* ボタンを少し控えめだけど押しやすいサイズに */
+    /* ボタン */
     button {
       cursor: pointer;
       padding: 0.8rem 1.6rem;
@@ -35,9 +26,7 @@
       border: none;
       border-radius: 0.5rem;
       transition: background-color 0.3s, transform 0.1s;
-      min-width: 140px; /* タップ領域を確保 */
     }
-    /* ダイスを振るボタン */
     #rollButton {
       background-color: #009688;
       color: #fff;
@@ -48,7 +37,6 @@
     #rollButton:active {
       transform: scale(0.95);
     }
-    /* リセットボタン */
     #resetButton {
       background-color: #f44336;
       color: #fff;
@@ -60,271 +48,139 @@
       transform: scale(0.95);
     }
 
-    /* サイコロアニメーション表示用要素 */
-    #diceAnimation {
-      width: 120px;
-      height: 120px;
-      margin: 1.5rem auto;
-      display: none;
-      background: url('https://user-images.githubusercontent.com/12163806/255397485-8882bd4c-b72c-40a4-8d01-5094ba57abde.png')
-                  no-repeat center / contain;
-      /* 3Dアニメ用 */
-      -webkit-transform-style: preserve-3d;
-              transform-style: preserve-3d;
+    /* ぐるぐる回転中の表示領域 */
+    #spinArea {
+      margin: 2rem auto 1rem;
+      font-size: 2.4rem;  
+      min-height: 2em;    /* 見た目が安定するように確保 */
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-weight: bold;
     }
 
-    /* diceをコロコロさせるアニメーション */
-    @-webkit-keyframes rollDice {
-      0% {
-        -webkit-transform: translate3d(0,0,0) rotate3d(1,0,0,0deg);
-                transform: translate3d(0,0,0) rotate3d(1,0,0,0deg);
-      }
-      100% {
-        /* 120px程度の横移動＋2回転(360*2=720) */
-        -webkit-transform: translate3d(120px,0,0) rotate3d(1,0,0,720deg);
-                transform: translate3d(120px,0,0) rotate3d(1,0,0,720deg);
-      }
+    /* 回転アニメーション */
+    @keyframes spin {
+      0%   { transform: rotate(0deg)   scale(1);   }
+      80%  { transform: rotate(1080deg) scale(1.2); }
+      100% { transform: rotate(1080deg) scale(1.2); }
     }
-    @keyframes rollDice {
-      0% {
-        -webkit-transform: translate3d(0,0,0) rotate3d(1,0,0,0deg);
-                transform: translate3d(0,0,0) rotate3d(1,0,0,0deg);
-      }
-      100% {
-        -webkit-transform: translate3d(120px,0,0) rotate3d(1,0,0,720deg);
-                transform: translate3d(120px,0,0) rotate3d(1,0,0,720deg);
-      }
-    }
-    .rolling {
-      display: block;
-      -webkit-animation: rollDice 1s ease-in-out forwards;
-              animation: rollDice 1s ease-in-out forwards;
+    .spinning {
+      animation: spin 1s ease-in-out forwards;
     }
 
     /* 結果表示エリア */
     #resultArea {
-      margin-top: 1.5rem;
-      font-size: 2.0rem;
+      font-size: 2.4rem;
       font-weight: bold;
       min-height: 2.4rem;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      justify-content: center;
-      /* ちょっと余白 */
-      margin-bottom: 1rem;
+      margin-top: 1rem;
     }
 
-    /* 大吉の派手な演出 + 追加フラッシュ */
+    /* 大吉アニメーション（派手めに） */
     .daikichi {
       color: gold;
-      -webkit-animation: flashKichi 1.5s infinite;
-              animation: flashKichi 1.5s infinite;
+      animation: daikichiAnim 1.5s infinite;
     }
-    @-webkit-keyframes flashKichi {
-      0% {
-        -webkit-transform: scale(1);
-                transform: scale(1);
+    @keyframes daikichiAnim {
+      0%   {
+        transform: scale(1);
         text-shadow: 0 0 8px gold;
       }
-      50% {
-        -webkit-transform: scale(1.3);
-                transform: scale(1.3);
+      50%  {
+        transform: scale(1.3);
         text-shadow: 0 0 25px orange;
       }
       100% {
-        -webkit-transform: scale(1);
-                transform: scale(1);
-        text-shadow: 0 0 8px gold;
-      }
-    }
-    @keyframes flashKichi {
-      0% {
-        -webkit-transform: scale(1);
-                transform: scale(1);
-        text-shadow: 0 0 8px gold;
-      }
-      50% {
-        -webkit-transform: scale(1.3);
-                transform: scale(1.3);
-        text-shadow: 0 0 25px orange;
-      }
-      100% {
-        -webkit-transform: scale(1);
-                transform: scale(1);
+        transform: scale(1);
         text-shadow: 0 0 8px gold;
       }
     }
 
-    /* 大凶の派手な演出（雷が落ちるようなフラッシュ + 揺れ） */
+    /* 大凶アニメーション（揺れ＋雷風フラッシュ） */
     .daikyo {
       color: red;
-      -webkit-animation: shakeKyo 0.8s linear, flashKyoColor 1s infinite alternate;
-              animation: shakeKyo 0.8s linear, flashKyoColor 1s infinite alternate;
+      animation: shakeKyo 0.8s linear, flashKyoColor 1s infinite alternate;
     }
     /* 揺れアニメーション */
-    @-webkit-keyframes shakeKyo {
-      0%   { -webkit-transform: translate(0, 0); transform: translate(0, 0); }
-      20%  { -webkit-transform: translate(-10px, 0); transform: translate(-10px, 0); }
-      40%  { -webkit-transform: translate(10px, 0); transform: translate(10px, 0); }
-      60%  { -webkit-transform: translate(-10px, 0); transform: translate(-10px, 0); }
-      80%  { -webkit-transform: translate(10px, 0); transform: translate(10px, 0); }
-      100% { -webkit-transform: translate(0, 0); transform: translate(0, 0); }
-    }
     @keyframes shakeKyo {
-      0%   { -webkit-transform: translate(0, 0); transform: translate(0, 0); }
-      20%  { -webkit-transform: translate(-10px, 0); transform: translate(-10px, 0); }
-      40%  { -webkit-transform: translate(10px, 0); transform: translate(10px, 0); }
-      60%  { -webkit-transform: translate(-10px, 0); transform: translate(-10px, 0); }
-      80%  { -webkit-transform: translate(10px, 0); transform: translate(10px, 0); }
-      100% { -webkit-transform: translate(0, 0); transform: translate(0, 0); }
+      0%   { transform: translate(0, 0); }
+      20%  { transform: translate(-10px, 0); }
+      40%  { transform: translate(10px, 0); }
+      60%  { transform: translate(-10px, 0); }
+      80%  { transform: translate(10px, 0); }
+      100% { transform: translate(0, 0); }
     }
-    /* 点滅アニメーション */
-    @-webkit-keyframes flashKyoColor {
-      from { text-shadow: 0 0 8px red; }
-      to   { text-shadow: 0 0 18px black; }
-    }
+    /* 点滅アニメ */
     @keyframes flashKyoColor {
-      from { text-shadow: 0 0 8px red; }
-      to   { text-shadow: 0 0 18px black; }
+      from { text-shadow: 0 0 8px red;   }
+      to   { text-shadow: 0 0 20px black;}
     }
 
-    /* 雷のフラッシュ演出用オーバーレイ */
-    #thunderOverlay {
-      position: fixed;
-      top: 0;
-      left: 0;
-      width: 100vw;
-      height: 100vh;
-      background-color: white;
-      opacity: 0;
-      pointer-events: none;
-      z-index: 9999;
-    }
-    @-webkit-keyframes thunderStrike {
-      0%   { opacity: 0; }
-      25%  { opacity: 1; }
-      50%  { opacity: 0; }
-      75%  { opacity: 1; }
-      100% { opacity: 0; }
-    }
-    @keyframes thunderStrike {
-      0%   { opacity: 0; }
-      25%  { opacity: 1; }
-      50%  { opacity: 0; }
-      75%  { opacity: 1; }
-      100% { opacity: 0; }
-    }
-    .active {
-      -webkit-animation: thunderStrike 0.8s ease-in-out;
-              animation: thunderStrike 0.8s ease-in-out;
-    }
-
-    /* 大吉用の軽い白フラッシュ演出 (お祝い感アップ) */
-    #kichiFlashOverlay {
-      position: fixed;
-      top: 0;
-      left: 0;
-      width: 100vw;
-      height: 100vh;
-      background-color: #ffffe0; /* 柔らかい白色 */
-      opacity: 0;
-      pointer-events: none;
-      z-index: 9998;
-    }
-    @-webkit-keyframes kichiStrike {
-      0%   { opacity: 0; }
-      30%  { opacity: 1; }
-      60%  { opacity: 0.4; }
-      100% { opacity: 0; }
-    }
-    @keyframes kichiStrike {
-      0%   { opacity: 0; }
-      30%  { opacity: 1; }
-      60%  { opacity: 0.4; }
-      100% { opacity: 0; }
-    }
-    .kichi-active {
-      -webkit-animation: kichiStrike 1s ease-in-out;
-              animation: kichiStrike 1s ease-in-out;
-    }
-
-    /* 統計表示 */
+    /* 統計エリア */
     #stats {
-      margin-top: 1.2rem;
+      margin-top: 1.5rem;
       font-size: 1rem;
       color: #555;
     }
   </style>
 </head>
 <body>
-  <h1>リスキーダイス</h1>
+  <h1>リスキーダイス（ぐるぐる回転演出）</h1>
 
-  <!-- リスキーダイスを振るボタン -->
   <button id="rollButton">リスキーダイスを振る</button>
-
-  <!-- サイコロが回転する演出用の要素 -->
-  <div id="diceAnimation"></div>
-
-  <!-- 結果表示エリア -->
-  <div id="resultArea"></div>
-
-  <!-- 統計表示エリア -->
-  <div id="stats"></div>
-
-  <!-- リセットボタン -->
   <button id="resetButton">リセット</button>
 
-  <!-- 大凶の雷フラッシュ演出オーバーレイ -->
-  <div id="thunderOverlay"></div>
+  <!-- ぐるぐる回転表示用 -->
+  <div id="spinArea"></div>
 
-  <!-- 大吉のフラッシュ演出オーバーレイ -->
-  <div id="kichiFlashOverlay"></div>
+  <!-- 結果表示用 -->
+  <div id="resultArea"></div>
+
+  <!-- 統計表示用 -->
+  <div id="stats"></div>
 
   <script>
-    // 累積カウンタの初期化
+    // 累積カウンタ
     let totalRolls = 0;
     let daikichiCount = 0;
     let daikyoCount   = 0;
 
-    // HTML要素を取得
-    const rollButton      = document.getElementById('rollButton');
-    const resetButton     = document.getElementById('resetButton');
-    const resultArea      = document.getElementById('resultArea');
-    const statsArea       = document.getElementById('stats');
-    const diceAnimation   = document.getElementById('diceAnimation');
-    const thunderOverlay  = document.getElementById('thunderOverlay');
-    const kichiFlashOverlay = document.getElementById('kichiFlashOverlay');
+    // 要素取得
+    const rollButton = document.getElementById('rollButton');
+    const resetButton = document.getElementById('resetButton');
+    const spinArea = document.getElementById('spinArea');
+    const resultArea = document.getElementById('resultArea');
+    const statsArea = document.getElementById('stats');
 
-    // ダイスを振る動作
     function rollRiskyDice() {
-      // 1/20の確率で大凶、それ以外は大吉
-      const roll = Math.floor(Math.random() * 20) + 1; 
-      
-      // ボタンを一時的に押せなくする (多重クリック防止)
+      // ボタン押下無効化
       rollButton.disabled = true;
 
-      // サイコロのアニメーション開始
-      diceAnimation.style.display = 'block';
-      diceAnimation.classList.add('rolling');
+      // 統計更新用
+      totalRolls++;
 
-      // アニメーションを1秒ほど再生後、結果を表示
+      // 1/20 で大凶、それ以外 大吉
+      const roll = Math.floor(Math.random() * 20) + 1;
+      
+      // ぐるぐる回転前の仮テキスト（演出用）
+      // 例: 「？？？」とか「・・・」など好きな文字でOK
+      spinArea.textContent = "？？？";
+      spinArea.classList.add('spinning');
+
+      // 1秒後に回転演出が止まり、結果を表示
       setTimeout(() => {
-        // サイコロアニメーションを非表示に戻す
-        diceAnimation.style.display = 'none';
-        diceAnimation.classList.remove('rolling');
+        spinArea.classList.remove('spinning');
+        spinArea.textContent = "";  // 演出用テキストをクリア
 
-        totalRolls++;
-
-        // 結果の表示
         if (roll === 1) {
+          // 大凶
           daikyoCount++;
-          showResult('大凶', 'daikyo');
-          thunderFlash(); // 雷のフラッシュ演出
+          showResult("大凶", "daikyo");
         } else {
+          // 大吉
           daikichiCount++;
-          showResult('大吉', 'daikichi');
-          kichiFlash();   // 大吉用フラッシュ演出
+          showResult("大吉", "daikichi");
         }
 
         updateStats();
@@ -332,52 +188,38 @@
       }, 1000);
     }
 
-    // 結果の表示・アニメーション付与
+    // 結果表示
     function showResult(text, cssClass) {
-      // 前のクラスを削除
+      // 前のクラスを外す
       resultArea.classList.remove('daikichi', 'daikyo');
-      // テキスト内容を更新
+      // テキスト更新
       resultArea.textContent = text;
-      // 新しいクラスを付与（色とアニメーション）
+      // 新クラス付与で派手アニメ発動
       resultArea.classList.add(cssClass);
     }
 
-    // 大凶の雷フラッシュを実行
-    function thunderFlash() {
-      thunderOverlay.classList.add('active');
-      setTimeout(() => {
-        thunderOverlay.classList.remove('active');
-      }, 800);
-    }
-
-    // 大吉の白フラッシュを実行
-    function kichiFlash() {
-      kichiFlashOverlay.classList.add('kichi-active');
-      setTimeout(() => {
-        kichiFlashOverlay.classList.remove('kichi-active');
-      }, 1000);
-    }
-
-    // 累積統計の更新
+    // 統計更新
     function updateStats() {
       statsArea.textContent = `回数: ${totalRolls} ／ 大吉: ${daikichiCount} ／ 大凶: ${daikyoCount}`;
     }
 
-    // リセット処理
+    // リセット
     function resetStats() {
-      totalRolls     = 0;
-      daikichiCount  = 0;
-      daikyoCount    = 0;
-      resultArea.textContent = '';
+      totalRolls = 0;
+      daikichiCount = 0;
+      daikyoCount = 0;
+      spinArea.textContent = "";
+      spinArea.classList.remove('spinning');
+      resultArea.textContent = "";
       resultArea.classList.remove('daikichi', 'daikyo');
       updateStats();
     }
 
-    // イベントリスナー登録
+    // イベント
     rollButton.addEventListener('click', rollRiskyDice);
     resetButton.addEventListener('click', resetStats);
 
-    // 初期表示
+    // 初期化
     updateStats();
   </script>
 </body>
