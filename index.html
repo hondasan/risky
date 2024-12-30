@@ -1,54 +1,108 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-  <meta charset="UTF-8">
+  <meta charset="UTF-8" />
   <title>リスキーダイス</title>
   <style>
     body {
       font-family: sans-serif;
       margin: 20px;
       text-align: center;
+      background-color: #f0f0f0;
     }
-
     h1 {
       color: #333;
     }
 
-    /* ボタンスタイル */
+    /* ボタンを押しやすく、大きめにする */
     button {
       cursor: pointer;
-      padding: 10px 20px;
-      font-size: 16px;
+      padding: 15px 30px;
+      font-size: 18px;
       margin: 10px;
+      border: none;
+      border-radius: 8px;
+      transition: background-color 0.3s, transform 0.1s;
+    }
+    /* ボタンの配色や操作感をアップ */
+    #rollButton {
+      background-color: #009688;
+      color: #fff;
+    }
+    #rollButton:hover {
+      background-color: #26a69a;
+    }
+    #rollButton:active {
+      transform: scale(0.95);
+    }
+    #resetButton {
+      background-color: #f44336;
+      color: #fff;
+    }
+    #resetButton:hover {
+      background-color: #e53935;
+    }
+    #resetButton:active {
+      transform: scale(0.95);
     }
 
-    /* 結果表示用 */
+    /* サイコロが振られたような演出用の要素 */
+    #diceAnimation {
+      width: 100px;
+      height: 100px;
+      margin: 20px auto;
+      display: none; /* 初期は非表示 */
+      background: url('https://user-images.githubusercontent.com/12163806/255397485-8882bd4c-b72c-40a4-8d01-5094ba57abde.png') 
+                  no-repeat center / contain;
+    }
+    /* サイコロをグルグル回転させるアニメーション */
+    @keyframes rollDice {
+      0%   { transform: rotate(0deg);   }
+      100% { transform: rotate(720deg); }
+    }
+    /* アニメーション用クラスを付与すると回転開始 */
+    .rolling {
+      animation: rollDice 1s ease-in-out infinite;
+    }
+
+    /* 結果表示エリア */
     #resultArea {
       margin-top: 20px;
-      font-size: 36px;
+      font-size: 40px;
       font-weight: bold;
-      min-height: 60px; /* 結果テキストがない状態でも高さを確保 */
+      min-height: 60px;
       display: flex;
       flex-direction: column;
       align-items: center;
       justify-content: center;
     }
 
-    /* 大吉表示用（点滅の簡易アニメーション） */
+    /* 「大吉」時の派手な演出 */
     .daikichi {
       color: gold;
-      animation: flashKichi 1s infinite alternate;
+      animation: flashKichi 1.5s infinite;
     }
     @keyframes flashKichi {
-      from { text-shadow: 0 0 10px gold; }
-      to   { text-shadow: 0 0 20px orange; }
+      0% {
+        transform: scale(1);
+        text-shadow: 0 0 10px gold;
+      }
+      50% {
+        transform: scale(1.4);
+        text-shadow: 0 0 30px orange;
+      }
+      100% {
+        transform: scale(1);
+        text-shadow: 0 0 10px gold;
+      }
     }
 
-    /* 大凶表示用（ちょっと揺れる簡易アニメーション） */
+    /* 「大凶」時の派手な演出（揺れ＋点滅） */
     .daikyo {
       color: red;
-      animation: shakeKyo 0.3s linear 0s 2;
+      animation: shakeKyo 0.7s linear, flashKyoColor 1s infinite alternate;
     }
+    /* 揺れアニメーション */
     @keyframes shakeKyo {
       0%   { transform: translate(0, 0); }
       20%  { transform: translate(-10px, 0); }
@@ -56,6 +110,11 @@
       60%  { transform: translate(-10px, 0); }
       80%  { transform: translate(10px, 0); }
       100% { transform: translate(0, 0); }
+    }
+    /* 点滅アニメーション */
+    @keyframes flashKyoColor {
+      from { text-shadow: 0 0 10px red; }
+      to   { text-shadow: 0 0 20px black; }
     }
 
     /* 統計表示 */
@@ -72,6 +131,9 @@
   <!-- リスキーダイスを振るボタン -->
   <button id="rollButton">リスキーダイスを振る</button>
 
+  <!-- サイコロが回転する演出用の要素 -->
+  <div id="diceAnimation"></div>
+
   <!-- 結果表示エリア -->
   <div id="resultArea"></div>
 
@@ -87,38 +149,51 @@
     let daikichiCount = 0;
     let daikyoCount   = 0;
 
-    // 結果表示用の要素を取得
-    const resultArea = document.getElementById('resultArea');
-    const statsArea  = document.getElementById('stats');
+    // HTML要素を取得
+    const rollButton     = document.getElementById('rollButton');
+    const resetButton    = document.getElementById('resetButton');
+    const resultArea     = document.getElementById('resultArea');
+    const statsArea      = document.getElementById('stats');
+    const diceAnimation  = document.getElementById('diceAnimation');
 
     // ダイスを振る動作
     function rollRiskyDice() {
       // 1/20の確率で大凶、それ以外は大吉
       const roll = Math.floor(Math.random() * 20) + 1; 
-      // 1～20の値を取得
-      let resultText = '';
       
-      totalRolls++;
+      // 演出：サイコロのアニメーションを表示
+      diceAnimation.style.display = 'block';
+      diceAnimation.classList.add('rolling');
 
-      if (roll === 1) {
-        resultText = '大凶';
-        daikyoCount++;
-        showResult(resultText, 'daikyo');
-      } else {
-        resultText = '大吉';
-        daikichiCount++;
-        showResult(resultText, 'daikichi');
-      }
+      // ボタンを一時的に押せなくする (多重クリック防止)
+      rollButton.disabled = true;
 
-      updateStats();
+      // アニメーションを1秒ほど再生後、結果を表示
+      setTimeout(() => {
+        diceAnimation.style.display = 'none';
+        diceAnimation.classList.remove('rolling');
+
+        totalRolls++;
+
+        if (roll === 1) {
+          daikyoCount++;
+          showResult('大凶', 'daikyo');
+        } else {
+          daikichiCount++;
+          showResult('大吉', 'daikichi');
+        }
+
+        updateStats();
+        rollButton.disabled = false;
+      }, 1000);
     }
 
     // 結果の表示・アニメーション付与
     function showResult(text, cssClass) {
       // 前のクラスを削除
       resultArea.classList.remove('daikichi', 'daikyo');
+      // テキスト内容を更新
       resultArea.textContent = text;
-
       // 新しいクラスを付与（色とアニメーション）
       resultArea.classList.add(cssClass);
     }
@@ -130,19 +205,19 @@
 
     // リセット処理
     function resetStats() {
-      totalRolls = 0;
-      daikichiCount = 0;
-      daikyoCount = 0;
+      totalRolls     = 0;
+      daikichiCount  = 0;
+      daikyoCount    = 0;
       resultArea.textContent = '';
       resultArea.classList.remove('daikichi', 'daikyo');
-      updateStats();  // 統計表示もリセット
+      updateStats();
     }
 
-    // ボタンにイベントリスナーを登録
-    document.getElementById('rollButton').addEventListener('click', rollRiskyDice);
-    document.getElementById('resetButton').addEventListener('click', resetStats);
+    // イベントリスナー登録
+    rollButton.addEventListener('click', rollRiskyDice);
+    resetButton.addEventListener('click', resetStats);
 
-    // 初期表示(リロードした直後の状態をクリアにしておきたい場合)
+    // 初期表示
     updateStats();
   </script>
 </body>
