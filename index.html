@@ -1,12 +1,23 @@
- sans-serif;
-      margin: 20px;
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <title>リスキーダイス（黒背景版）</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <style>
+    /* 全体を黒基調 */
+    body {
+      background-color: #000; 
+      color: #fff;           /* 通常テキストは白で */
+      font-family: sans-serif;
+      margin: 16px;
       text-align: center;
-      background-color: #fafafa;
     }
+
     h1 {
-      margin-bottom: 1.2rem;
-      font-size: 1.5rem;
-      color: #333;
+      font-size: 1.4rem;
+      margin-bottom: 1rem;
+      color: #fff;
     }
 
     /* ボタン */
@@ -20,198 +31,151 @@
       transition: background-color 0.3s, transform 0.1s;
     }
     #rollButton {
-      background-color: #009688;
+      background-color: #444;
       color: #fff;
     }
     #rollButton:hover {
-      background-color: #26a69a;
+      background-color: #555;
     }
     #rollButton:active {
       transform: scale(0.95);
     }
     #resetButton {
-      background-color: #f44336;
-      color: #fff;
+      background-color: #222;
+      color: #f66;
     }
     #resetButton:hover {
-      background-color: #e53935;
+      background-color: #333;
     }
     #resetButton:active {
       transform: scale(0.95);
     }
 
-    /* ぐるぐる回転中の表示領域 */
-    #spinArea {
-      margin: 2rem auto 1rem;
-      font-size: 2.4rem;  
-      min-height: 2em;    /* 見た目が安定するように確保 */
+    /* 結果表示を固定高さにして、消えたときに上下がずれないようにする */
+    #resultWrapper {
+      margin: 1.5rem auto;
+      /* 好きな高さを指定して、消えるときのレイアウトずれを防止 */
+      min-height: 80px; 
       display: flex;
       align-items: center;
       justify-content: center;
-      font-weight: bold;
     }
 
-    /* 回転アニメーション */
-    @keyframes spin {
-      0%   { transform: rotate(0deg)   scale(1);   }
-      80%  { transform: rotate(1080deg) scale(1.2); }
-      100% { transform: rotate(1080deg) scale(1.2); }
-    }
-    .spinning {
-      animation: spin 1s ease-in-out forwards;
-    }
-
-    /* 結果表示エリア */
-    #resultArea {
+    /* 実際の結果テキスト */
+    #resultText {
       font-size: 2.4rem;
       font-weight: bold;
-      min-height: 2.4rem;
-      margin-top: 1rem;
+      /* 初期状態は透明にしておく(アニメーションのため) */
+      opacity: 1;
+      transition: opacity 0.3s;
     }
 
-    /* 大吉アニメーション（派手めに） */
+    /* 大吉は白文字 */
     .daikichi {
-      color: gold;
-      animation: daikichiAnim 1.5s infinite;
+      color: #fff; 
     }
-    @keyframes daikichiAnim {
-      0%   {
-        transform: scale(1);
-        text-shadow: 0 0 8px gold;
-      }
-      50%  {
-        transform: scale(1.3);
-        text-shadow: 0 0 25px orange;
-      }
-      100% {
-        transform: scale(1);
-        text-shadow: 0 0 8px gold;
-      }
-    }
-
-    /* 大凶アニメーション（揺れ＋雷風フラッシュ） */
+    /* 大凶は赤文字 */
     .daikyo {
-      color: red;
-      animation: shakeKyo 0.8s linear, flashKyoColor 1s infinite alternate;
-    }
-    /* 揺れアニメーション */
-    @keyframes shakeKyo {
-      0%   { transform: translate(0, 0); }
-      20%  { transform: translate(-10px, 0); }
-      40%  { transform: translate(10px, 0); }
-      60%  { transform: translate(-10px, 0); }
-      80%  { transform: translate(10px, 0); }
-      100% { transform: translate(0, 0); }
-    }
-    /* 点滅アニメ */
-    @keyframes flashKyoColor {
-      from { text-shadow: 0 0 8px red;   }
-      to   { text-shadow: 0 0 20px black;}
+      color: #f22; 
     }
 
-    /* 統計エリア */
+    /* フェードアウト＆フェードイン用のクラス */
+    .fade-out {
+      opacity: 0 !important;
+    }
+    .fade-in {
+      opacity: 1 !important;
+    }
+
+    /* 統計表示 */
     #stats {
       margin-top: 1.5rem;
       font-size: 1rem;
-      color: #555;
+      color: #ccc;
     }
   </style>
 </head>
 <body>
   <h1>リスキーダイス</h1>
 
-  <button id="rollButton">リスキーダイスを振る</button>
+  <!-- 振る / リセット ボタン -->
+  <button id="rollButton">振る</button>
   <button id="resetButton">リセット</button>
 
-  <!-- ぐるぐる回転表示用 -->
-  <div id="spinArea"></div>
+  <!-- 結果を中央に固定表示するため、ラッパーに固定高さをつける -->
+  <div id="resultWrapper">
+    <!-- 実際の結果テキスト -->
+    <div id="resultText"></div>
+  </div>
 
-  <!-- 結果表示用 -->
-  <div id="resultArea"></div>
-
-  <!-- 統計表示用 -->
+  <!-- 統計表示 -->
   <div id="stats"></div>
 
   <script>
-    // 累積カウンタ
     let totalRolls = 0;
     let daikichiCount = 0;
-    let daikyoCount   = 0;
+    let daikyoCount = 0;
 
-    // 要素取得
-    const rollButton = document.getElementById('rollButton');
+    const rollButton  = document.getElementById('rollButton');
     const resetButton = document.getElementById('resetButton');
-    const spinArea = document.getElementById('spinArea');
-    const resultArea = document.getElementById('resultArea');
-    const statsArea = document.getElementById('stats');
+    const resultText  = document.getElementById('resultText');
+    const statsArea   = document.getElementById('stats');
 
     function rollRiskyDice() {
-      // ボタン押下無効化
-      rollButton.disabled = true;
-
-      // 統計更新用
+      rollButton.disabled = true; // 多重クリック防止
       totalRolls++;
 
-      // 1/20 で大凶、それ以外 大吉
+      // 1/20で大凶、それ以外は大吉
       const roll = Math.floor(Math.random() * 20) + 1;
-      
-      // ぐるぐる回転前の仮テキスト（演出用）
-      // 例: 「？？？」とか「・・・」など好きな文字でOK
-      spinArea.textContent = "？？？";
-      spinArea.classList.add('spinning');
+      let nextResult = (roll === 1) ? '大凶' : '大吉';
+      let nextClass  = (roll === 1) ? 'daikyo' : 'daikichi';
 
-      // 1秒後に回転演出が止まり、結果を表示
+      // 1) まず現在の表示をフェードアウト
+      resultText.classList.add('fade-out');
+
       setTimeout(() => {
-        spinArea.classList.remove('spinning');
-        spinArea.textContent = "";  // 演出用テキストをクリア
+        // 2) テキストを消してクラスも一度外す
+        resultText.textContent = '';
+        resultText.classList.remove('daikichi', 'daikyo', 'fade-out', 'fade-in');
 
+        // 3) 新しい結果をセット & クラス付与
+        resultText.textContent = nextResult;
+        resultText.classList.add(nextClass);
+
+        // 統計を更新
         if (roll === 1) {
-          // 大凶
           daikyoCount++;
-          showResult("大凶", "daikyo");
         } else {
-          // 大吉
           daikichiCount++;
-          showResult("大吉", "daikichi");
         }
-
         updateStats();
-        rollButton.disabled = false;
-      }, 1000);
+
+        // 4) 少し時間をおいてからフェードイン
+        setTimeout(() => {
+          resultText.classList.add('fade-in');
+          rollButton.disabled = false;
+        }, 50);
+
+      }, 300); // フェードアウトのtransition時間(0.3s)に合わせる
     }
 
-    // 結果表示
-    function showResult(text, cssClass) {
-      // 前のクラスを外す
-      resultArea.classList.remove('daikichi', 'daikyo');
-      // テキスト更新
-      resultArea.textContent = text;
-      // 新クラス付与で派手アニメ発動
-      resultArea.classList.add(cssClass);
-    }
-
-    // 統計更新
-    function updateStats() {
-      statsArea.textContent = `回数: ${totalRolls} ／ 大吉: ${daikichiCount} ／ 大凶: ${daikyoCount}`;
-    }
-
-    // リセット
     function resetStats() {
       totalRolls = 0;
       daikichiCount = 0;
       daikyoCount = 0;
-      spinArea.textContent = "";
-      spinArea.classList.remove('spinning');
-      resultArea.textContent = "";
-      resultArea.classList.remove('daikichi', 'daikyo');
+      resultText.textContent = '';
+      resultText.classList.remove('daikichi', 'daikyo', 'fade-out', 'fade-in');
       updateStats();
     }
 
-    // イベント
+    function updateStats() {
+      statsArea.textContent = 
+        `回数: ${totalRolls} ／ 大吉: ${daikichiCount} ／ 大凶: ${daikyoCount}`;
+    }
+
     rollButton.addEventListener('click', rollRiskyDice);
     resetButton.addEventListener('click', resetStats);
 
-    // 初期化
     updateStats();
   </script>
 </body>
