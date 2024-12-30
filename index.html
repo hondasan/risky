@@ -2,11 +2,13 @@
 <html lang="ja">
 <head>
   <meta charset="UTF-8" />
+  <!-- iPhoneなどスマホで正しく表示されるようにmeta viewportを設定 -->
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>リスキーダイス</title>
   <style>
-    /* 全体を大きめに表示するため、ベースとなるフォントサイズを引き上げ */
+    /* 全体のフォントサイズを上げる */
     html {
-      font-size: 20px;
+      font-size: 24px; /* ボタン含め、全体を少し大きめに */
     }
     body {
       font-family: sans-serif;
@@ -16,19 +18,21 @@
     }
     h1 {
       color: #333;
-      font-size: 2rem; /* 文字を大きめに */
-      margin-bottom: 2rem;
+      font-size: 2rem;
+      margin-bottom: 1.5rem;
     }
 
-    /* ボタンをより大きく */
+    /* ボタンをさらに押しやすいサイズに */
     button {
       cursor: pointer;
-      padding: 1rem 2rem;
-      font-size: 1.2rem;
+      padding: 1.2rem 2.5rem;
+      font-size: 1.3rem;
       margin: 1rem;
       border: none;
       border-radius: 0.5rem;
       transition: background-color 0.3s, transform 0.1s;
+      /* iOSでタップしやすいように最低のタップ領域を確保 */
+      min-width: 180px;
     }
     /* ダイスを振るボタン */
     #rollButton {
@@ -53,34 +57,60 @@
       transform: scale(0.95);
     }
 
-    /* サイコロアニメーション表示用 */
+    /* サイコロアニメーション表示用要素（大きめに） */
     #diceAnimation {
-      width: 200px;     /* 大きめのサイコロ画像に */
+      width: 200px;
       height: 200px;
       margin: 2rem auto;
-      display: none;    /* 初期は非表示 */
-      background: url('https://user-images.githubusercontent.com/12163806/255397485-8882bd4c-b72c-40a4-8d01-5094ba57abde.png') 
+      display: none;
+      /* iOS Safariで3Dアニメーションする場合、親要素やhtml要素に perspective が必要な場合がある */
+      background: url('https://user-images.githubusercontent.com/12163806/255397485-8882bd4c-b72c-40a4-8d01-5094ba57abde.png')
                   no-repeat center / contain;
     }
+
+    /* 親要素で3D変換を有効にするため、bodyにperspectiveを付与するのも一つの手 */
+    body {
+      -webkit-perspective: 1000px; /* iOS Safari向け */
+      perspective: 1000px;
+    }
+
     /* サイコロが転がるようなアニメーション */
-    @keyframes rollDice {
+    /* iOS Safari向けに -webkit- プレフィックスをつける */
+    @-webkit-keyframes rollDice {
       0% {
-        transform: translateX(0) rotateX(0deg) rotateZ(0deg);
+        -webkit-transform: translateX(0) rotateX(0deg) rotateZ(0deg);
+                transform: translateX(0) rotateX(0deg) rotateZ(0deg);
       }
       100% {
-        /* 横に移動＋3D回転 */
-        transform: translateX(250px) rotateX(720deg) rotateZ(720deg);
+        -webkit-transform: translateX(250px) rotateX(720deg) rotateZ(720deg);
+                transform: translateX(250px) rotateX(720deg) rotateZ(720deg);
       }
     }
+    @keyframes rollDice {
+      0% {
+        -webkit-transform: translateX(0) rotateX(0deg) rotateZ(0deg);
+                transform: translateX(0) rotateX(0deg) rotateZ(0deg);
+      }
+      100% {
+        -webkit-transform: translateX(250px) rotateX(720deg) rotateZ(720deg);
+                transform: translateX(250px) rotateX(720deg) rotateZ(720deg);
+      }
+    }
+
+    /* アニメーションを適用するクラス */
     .rolling {
-      /* 1秒で移動＋回転。その後繰り返さない (forwards で最後の状態を保持) */
-      animation: rollDice 1s ease-in-out forwards;
+      display: block;
+      /* iOS Safariで3Dアニメーションをする際は -webkit-animation も併用 */
+      -webkit-animation: rollDice 1s ease-in-out forwards;
+              animation: rollDice 1s ease-in-out forwards;
+      /* iOSでレイヤーを独立させるためにハードウェアアクセラレーションを使う場合もあるが、
+         今回は必須ではないので省略（必要なら translateZ(0) を付けるなど）。 */
     }
 
     /* 結果表示エリア */
     #resultArea {
       margin-top: 2rem;
-      font-size: 3rem;      /* 結果をさらに大きく */
+      font-size: 3rem;
       font-weight: bold;
       min-height: 3rem;
       display: flex;
@@ -92,19 +122,40 @@
     /* 大吉の派手な演出 */
     .daikichi {
       color: gold;
-      animation: flashKichi 1.5s infinite;
+      -webkit-animation: flashKichi 1.5s infinite;
+              animation: flashKichi 1.5s infinite;
     }
-    @keyframes flashKichi {
+    @-webkit-keyframes flashKichi {
       0% {
-        transform: scale(1);
+        -webkit-transform: scale(1);
+                transform: scale(1);
         text-shadow: 0 0 10px gold;
       }
       50% {
-        transform: scale(1.4);
+        -webkit-transform: scale(1.4);
+                transform: scale(1.4);
         text-shadow: 0 0 30px orange;
       }
       100% {
-        transform: scale(1);
+        -webkit-transform: scale(1);
+                transform: scale(1);
+        text-shadow: 0 0 10px gold;
+      }
+    }
+    @keyframes flashKichi {
+      0% {
+        -webkit-transform: scale(1);
+                transform: scale(1);
+        text-shadow: 0 0 10px gold;
+      }
+      50% {
+        -webkit-transform: scale(1.4);
+                transform: scale(1.4);
+        text-shadow: 0 0 30px orange;
+      }
+      100% {
+        -webkit-transform: scale(1);
+                transform: scale(1);
         text-shadow: 0 0 10px gold;
       }
     }
@@ -112,18 +163,32 @@
     /* 大凶の派手な演出（雷が落ちるようなフラッシュ + 揺れ） */
     .daikyo {
       color: red;
-      animation: shakeKyo 0.8s linear, flashKyoColor 1s infinite alternate;
+      /* iOS Safari向けに -webkit-animation も指定 */
+      -webkit-animation: shakeKyo 0.8s linear, flashKyoColor 1s infinite alternate;
+              animation: shakeKyo 0.8s linear, flashKyoColor 1s infinite alternate;
     }
     /* 揺れアニメーション */
+    @-webkit-keyframes shakeKyo {
+      0%   { -webkit-transform: translate(0, 0); transform: translate(0, 0); }
+      20%  { -webkit-transform: translate(-15px, 0); transform: translate(-15px, 0); }
+      40%  { -webkit-transform: translate(15px, 0); transform: translate(15px, 0); }
+      60%  { -webkit-transform: translate(-15px, 0); transform: translate(-15px, 0); }
+      80%  { -webkit-transform: translate(15px, 0); transform: translate(15px, 0); }
+      100% { -webkit-transform: translate(0, 0); transform: translate(0, 0); }
+    }
     @keyframes shakeKyo {
-      0%   { transform: translate(0, 0); }
-      20%  { transform: translate(-15px, 0); }
-      40%  { transform: translate(15px, 0); }
-      60%  { transform: translate(-15px, 0); }
-      80%  { transform: translate(15px, 0); }
-      100% { transform: translate(0, 0); }
+      0%   { -webkit-transform: translate(0, 0); transform: translate(0, 0); }
+      20%  { -webkit-transform: translate(-15px, 0); transform: translate(-15px, 0); }
+      40%  { -webkit-transform: translate(15px, 0); transform: translate(15px, 0); }
+      60%  { -webkit-transform: translate(-15px, 0); transform: translate(-15px, 0); }
+      80%  { -webkit-transform: translate(15px, 0); transform: translate(15px, 0); }
+      100% { -webkit-transform: translate(0, 0); transform: translate(0, 0); }
     }
     /* 点滅アニメーション */
+    @-webkit-keyframes flashKyoColor {
+      from { text-shadow: 0 0 10px red; }
+      to   { text-shadow: 0 0 30px black; }
+    }
     @keyframes flashKyoColor {
       from { text-shadow: 0 0 10px red; }
       to   { text-shadow: 0 0 30px black; }
@@ -138,10 +203,17 @@
       height: 100vh;
       background-color: white;
       opacity: 0;
-      pointer-events: none; /* マウス操作は透過 */
-      z-index: 9999;        /* 最前面 */
+      pointer-events: none;
+      z-index: 9999;
     }
-    /* 雷のフラッシュを表現 (短時間でパッと光って消える) */
+    /* 雷のフラッシュ: iOS Safari向け -webkit-keyframes */
+    @-webkit-keyframes thunderStrike {
+      0%   { opacity: 0; }
+      25%  { opacity: 1; }
+      50%  { opacity: 0; }
+      75%  { opacity: 1; }
+      100% { opacity: 0; }
+    }
     @keyframes thunderStrike {
       0%   { opacity: 0; }
       25%  { opacity: 1; }
@@ -150,13 +222,14 @@
       100% { opacity: 0; }
     }
     .active {
-      animation: thunderStrike 0.8s ease-in-out;
+      -webkit-animation: thunderStrike 0.8s ease-in-out;
+              animation: thunderStrike 0.8s ease-in-out;
     }
 
     /* 統計表示 */
     #stats {
       margin-top: 2rem;
-      font-size: 1.2rem;
+      font-size: 1.4rem;
       color: #555;
     }
   </style>
@@ -245,7 +318,7 @@
     function thunderFlash() {
       // #thunderOverlay にクラスを付与してアニメーション
       thunderOverlay.classList.add('active');
-      // アニメーションが終わったらクラスを取り除く
+      // アニメーションが終わったらクラスを外す
       setTimeout(() => {
         thunderOverlay.classList.remove('active');
       }, 800);
