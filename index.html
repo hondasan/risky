@@ -2,7 +2,7 @@
 <html lang="ja">
 <head>
   <meta charset="UTF-8" />
-  <title>リスキーダイス</title>
+  <title>リスキーダイス（??? → 回転 → 大吉/大凶 + ローカルストレージ）</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <style>
     /* 黒背景 & 全体設定 */
@@ -51,18 +51,17 @@
       transform: scale(0.95);
     }
 
-    /* 結果表示領域
-       min-heightで高さを固定し、???や大吉／大凶の切り替えでガタガタしないようにする */
+    /* 結果表示領域（高さ固定でガタつき防止） */
     #resultWrapper {
       margin: 1.5rem auto;
       min-height: 80px; 
       display: flex;
       align-items: center;
       justify-content: center;
-      position: relative; /* オーバーレイ演出で使う */
+      position: relative;
     }
 
-    /* 結果テキスト */
+    /* 実際のテキストを表示する要素 */
     #resultText {
       font-size: 2.4rem;
       font-weight: bold;
@@ -70,7 +69,7 @@
       transition: opacity 0.3s;
     }
 
-    /* ???回転用アニメーション */
+    /* ???回転アニメーション */
     @keyframes spinQuestion {
       0%   { transform: rotate(0deg)   scale(1);   }
       50%  { transform: rotate(540deg) scale(1.3); }
@@ -80,7 +79,7 @@
       animation: spinQuestion 1s ease-in-out forwards;
     }
 
-    /* フェードアウト＆フェードイン用 */
+    /* 簡単なフェード効果 */
     .fade-out {
       opacity: 0 !important;
     }
@@ -88,7 +87,8 @@
       opacity: 1 !important;
     }
 
-    /* 大吉: 白文字（ベース）、金色の光に包まれる演出 */
+    /* 大吉・大凶の見た目＆演出 */
+    /* 大吉: 白文字（＋祝福アニメを追加してもOK） */
     .daikichi {
       color: #fff;
       animation: kichiBless 1.2s infinite;
@@ -99,7 +99,7 @@
       100% { text-shadow: 0 0 10px goldenrod;  transform: scale(1); }
     }
 
-    /* 大凶: 赤文字、稲妻エフェクト */
+    /* 大凶: 赤文字（＋不幸アニメ） */
     .daikyo {
       color: #f22;
       animation: kyoUnlucky 1.2s infinite;
@@ -110,6 +110,14 @@
       50%  { text-shadow: 0 0 10px red;         transform: rotate(-3deg); }
       75%  { text-shadow: 0 0 20px darkred;     transform: rotate(3deg);  }
       100% { text-shadow: 0 0 8px red;          transform: rotate(0deg);  }
+    }
+
+    /* ログメッセージ（大凶での「○回分の不幸が舞い降りる」など） */
+    #logMessage {
+      margin-top: 1rem;
+      color: #ffa;  /* 少し目立つ色 */
+      font-size: 1rem;
+      min-height: 1.2em;
     }
 
     /* 統計表示 */
@@ -123,111 +131,142 @@
 <body>
   <h1>リスキーダイス</h1>
 
-  <!-- ボタン -->
+  <!-- 振る・リセットボタン -->
   <button id="rollButton">振る</button>
   <button id="resetButton">リセット</button>
 
-  <!-- 結果表示領域（高さ固定） -->
+  <!-- 結果表示領域 -->
   <div id="resultWrapper">
-    <!-- 実際のテキストを表示する要素 -->
+    <!-- メイン結果表示テキスト -->
     <div id="resultText"></div>
   </div>
+
+  <!-- 大凶時に表示するメッセージ -->
+  <div id="logMessage"></div>
 
   <!-- 統計表示 -->
   <div id="stats"></div>
 
   <script>
-    let totalRolls = 0;
-    let daikichiCount = 0;
-    let daikyoCount   = 0;
+    // --- ローカルストレージのキー設定 ---
+    const LS_KEY_DAIKICHI_STREAK = 'daikichiStreak';
+    const LS_KEY_TOTAL_ROLLS     = 'totalRolls';
+
+    // 既存データを読み込み（なければ0）
+    let daikichiStreak = parseInt(localStorage.getItem(LS_KEY_DAIKICHI_STREAK) || '0', 10);
+    let totalRolls     = parseInt(localStorage.getItem(LS_KEY_TOTAL_ROLLS)     || '0', 10);
 
     const rollButton  = document.getElementById('rollButton');
     const resetButton = document.getElementById('resetButton');
     const resultText  = document.getElementById('resultText');
+    const logMessage  = document.getElementById('logMessage');
     const statsArea   = document.getElementById('stats');
 
+    // ----------------------------------
+    // ダイスを振る (??? → 回転 → 結果)
+    // ----------------------------------
     function rollRiskyDice() {
-      rollButton.disabled = true;  // 多重クリック防止
+      rollButton.disabled = true;
       totalRolls++;
 
-      // 1/20で大凶、それ以外大吉
+      // 1/20が大凶
       const roll = Math.floor(Math.random() * 20) + 1;
       const isDaikyo = (roll === 1);
 
-      // まず「???」をぐるぐる回して演出
+      // ???回転演出を実行
       showQuestionSpin(() => {
-        // ぐるぐる演出が終わったら結果表示
+        // 回転演出後のコールバックで結果を表示
         if (isDaikyo) {
-          daikyoCount++;
-          showResult("大凶", "daikyo");
+          // 大凶
+          logMessage.textContent = `大凶！ ${daikichiStreak}回分の不幸が舞い降りました…`;
+          resultText.textContent = '大凶';
+          resultText.classList.add('daikyo', 'fade-in');
+
+          // 大凶が出たらローカルストレージをリセット
+          daikichiStreak = 0;
+          localStorage.removeItem(LS_KEY_DAIKICHI_STREAK);
+
         } else {
-          daikichiCount++;
-          showResult("大吉", "daikichi");
+          // 大吉
+          daikichiStreak++;
+          resultText.textContent = '大吉';
+          resultText.classList.add('daikichi', 'fade-in');
+          logMessage.textContent = ''; // 大凶メッセージは消しておく
+          // daikichiStreakを保存
+          localStorage.setItem(LS_KEY_DAIKICHI_STREAK, daikichiStreak.toString());
         }
+
+        // totalRollsを保存
+        localStorage.setItem(LS_KEY_TOTAL_ROLLS, totalRolls.toString());
+
         updateStats();
+        rollButton.disabled = false;
       });
     }
 
-    // ???をぐるぐる表示して、終了後にコールバック
+    // ----------------------------------
+    // ???を回転表示 → 消した後にコールバック
+    // ----------------------------------
     function showQuestionSpin(callback) {
-      // いったん前の結果をフェードアウト
+      // 前の結果をフェードアウト
       resultText.classList.add('fade-out');
 
       setTimeout(() => {
-        // テキスト消去＆アニメクラス除去
-        resultText.textContent = "";
+        // 一度テキストやクラスを消去
+        resultText.textContent = '';
         resultText.classList.remove('daikichi', 'daikyo', 'fade-out', 'fade-in');
 
-        // ???表示
+        // ??? にして回転開始
         resultText.textContent = "???";
-        // ???を回転させるクラスを付与
-        resultText.classList.add('spin');
+        resultText.classList.add('spin', 'fade-in');
 
-        // ???は最初に即フェードインしておきたい（下でspinと同時に表示）
-        resultText.classList.add('fade-in');
-
-        // 1秒後(spinアニメ完了後)に???を消してcallback
+        // 1秒後(回転アニメ完了)に???を消して、コールバックへ
         setTimeout(() => {
-          // ???をフェードアウト
+          // ??? をフェードアウト
           resultText.classList.remove('fade-in');
           resultText.classList.add('fade-out');
           resultText.classList.remove('spin');
 
-          // ???が消え切るのを待って結果表示へ
           setTimeout(() => {
+            // ??? を空に
             resultText.textContent = "";
             resultText.classList.remove('fade-out');
-            // コールバックで大吉／大凶を表示
+            // 結果表示へ
             callback();
-            rollButton.disabled = false; 
-          }, 300); 
-        }, 1000); 
-      }, 300); // まずは前の結果を完全に消しきる0.3秒待ち
+          }, 300);
+        }, 1000);
+      }, 300); 
     }
 
-    // 大吉 or 大凶を最終表示
-    function showResult(text, className) {
-      resultText.textContent = text;
-      // 派手アニメclassを付与し、フェードイン
-      resultText.classList.add(className, 'fade-in');
-    }
-
+    // ----------------------------------
+    // 統計表示の更新
+    // ----------------------------------
     function updateStats() {
       statsArea.textContent = 
-        `回数: ${totalRolls} ／ 大吉: ${daikichiCount} ／ 大凶: ${daikyoCount}`;
+        `累計: ${totalRolls}回 ／ 現在の大吉連続: ${daikichiStreak}回`;
     }
 
+    // ----------------------------------
+    // リセット処理（ローカルストレージもクリア）
+    // ----------------------------------
     function resetStats() {
+      daikichiStreak = 0;
       totalRolls     = 0;
-      daikichiCount  = 0;
-      daikyoCount    = 0;
-      resultText.textContent = "";
+      localStorage.removeItem(LS_KEY_DAIKICHI_STREAK);
+      localStorage.removeItem(LS_KEY_TOTAL_ROLLS);
+
+      resultText.textContent = '';
       resultText.classList.remove('daikichi', 'daikyo', 'fade-out', 'fade-in', 'spin');
+      logMessage.textContent = '';
+
       updateStats();
     }
 
+    // ボタンのイベント
     rollButton.addEventListener('click', rollRiskyDice);
     resetButton.addEventListener('click', resetStats);
+
+    // 初期表示
     updateStats();
   </script>
 </body>
