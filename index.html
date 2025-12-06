@@ -1,273 +1,609 @@
 <!DOCTYPE html>
 <html lang="ja">
 <head>
-  <meta charset="UTF-8" />
-    <title>リスキーダイス</title>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <style>
-    /* 黒背景 & 全体設定 */
-    body {
-      background-color: #000;
-      color: #fff;
-      font-family: sans-serif;
-      margin: 16px;
-      text-align: center;
-    }
-
-    h1 {
-      font-size: 1.4rem;
-      margin-bottom: 1rem;
-      color: #fff;
-    }
-
-    /* ボタン */
-    button {
-      cursor: pointer;
-      padding: 0.8rem 1.6rem;
-      font-size: 1rem;
-      margin: 0.8rem;
-      border: none;
-      border-radius: 0.5rem;
-      transition: background-color 0.3s, transform 0.1s;
-    }
-    #rollButton {
-      background-color: #444;
-      color: #fff;
-    }
-    #rollButton:hover {
-      background-color: #555;
-    }
-    #rollButton:active {
-      transform: scale(0.95);
-    }
-    #resetButton {
-      background-color: #222;
-      color: #f66;
-    }
-    #resetButton:hover {
-      background-color: #333;
-    }
-    #resetButton:active {
-      transform: scale(0.95);
-    }
-
-    /* 結果表示領域（高さ固定でガタつき防止） */
-    #resultWrapper {
-      margin: 1.5rem auto;
-      min-height: 80px; 
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      position: relative;
-    }
-
-    /* 実際のテキストを表示する要素 */
-    #resultText {
-      font-size: 2.4rem;
-      font-weight: bold;
-      opacity: 1;
-      transition: opacity 0.3s;
-    }
-
-    /* ???回転アニメーション */
-    @keyframes spinQuestion {
-      0%   { transform: rotate(0deg)   scale(1);   }
-      50%  { transform: rotate(540deg) scale(1.3); }
-      100% { transform: rotate(1080deg)scale(1);   }
-    }
-    .spin {
-      animation: spinQuestion 1s ease-in-out forwards;
-    }
-
-    /* 簡単なフェード効果 */
-    .fade-out {
-      opacity: 0 !important;
-    }
-    .fade-in {
-      opacity: 1 !important;
-    }
-
-    /* 大吉・大凶の見た目＆演出 */
-    /* 大吉: 白文字（＋祝福アニメを追加してもOK） */
-    .daikichi {
-      color: #fff;
-      animation: kichiBless 1.2s infinite;
-    }
-    @keyframes kichiBless {
-      0%   { text-shadow: 0 0 10px gold;       transform: scale(1); }
-      50%  { text-shadow: 0 0 30px gold;       transform: scale(1.3);}
-      100% { text-shadow: 0 0 10px goldenrod;  transform: scale(1); }
-    }
-
-    /* 大凶: 赤文字（＋不幸アニメ） */
-    .daikyo {
-      color: #f22;
-      animation: kyoUnlucky 1.2s infinite;
-    }
-    @keyframes kyoUnlucky {
-      0%   { text-shadow: 0 0 8px red;          transform: rotate(0deg); }
-      25%  { text-shadow: 0 0 16px yellow;      transform: rotate(3deg);  }
-      50%  { text-shadow: 0 0 10px red;         transform: rotate(-3deg); }
-      75%  { text-shadow: 0 0 20px darkred;     transform: rotate(3deg);  }
-      100% { text-shadow: 0 0 8px red;          transform: rotate(0deg);  }
-    }
-
-    /* ログメッセージ（大凶での「○回分の不幸が舞い降りる」など） */
-    #logMessage {
-      margin-top: 1rem;
-      color: #ffa;  /* 少し目立つ色 */
-      font-size: 1rem;
-      min-height: 1.2em;
-    }
-
-    /* 統計表示 */
-    #stats {
-      margin-top: 1.5rem;
-      font-size: 1rem;
-      color: #ccc;
-    }
-  </style>
-</head>
-<body>
-  <h1>リスキーダイス</h1>
-
-  <!-- 振る・リセットボタン -->
-  <button id="rollButton">振る</button>
-  <button id="resetButton">リセット</button>
-
-  <!-- 結果表示領域 -->
-  <div id="resultWrapper">
-    <!-- メイン結果表示テキスト -->
-    <div id="resultText"></div>
-  </div>
-
-  <!-- 大凶時に表示するメッセージ -->
-  <div id="logMessage"></div>
-
-  <!-- 統計表示 -->
-  <div id="stats"></div>
-
-  <script>
-    // --- ローカルストレージのキー設定 ---
-    const LS_KEY_DAIKICHI_STREAK = 'daikichiStreak';
-    const LS_KEY_TOTAL_ROLLS     = 'totalRolls';
-
-    // 既存データを読み込み（なければ0）
-    let daikichiStreak = parseInt(localStorage.getItem(LS_KEY_DAIKICHI_STREAK) || '0', 10);
-    let totalRolls     = parseInt(localStorage.getItem(LS_KEY_TOTAL_ROLLS)     || '0', 10);
-
-    const rollButton  = document.getElementById('rollButton');
-    const resetButton = document.getElementById('resetButton');
-    const resultText  = document.getElementById('resultText');
-    const logMessage  = document.getElementById('logMessage');
-    const statsArea   = document.getElementById('stats');
-
-    // ----------------------------------
-    // ダイスを振る (??? → 回転 → 結果)
-    // ----------------------------------
-    function rollRiskyDice() {
-      rollButton.disabled = true;
-      totalRolls++;
-
-      // 1/20が大凶
-      const roll = Math.floor(Math.random() * 20) + 1;
-      const isDaikyo = (roll === 1);
-
-      // ???回転演出を実行
-      showQuestionSpin(() => {
-        // 回転演出後のコールバックで結果を表示
-        if (isDaikyo) {
-          // 大凶
-          logMessage.textContent = `大凶！ ${daikichiStreak}回分の不幸が舞い降りました…`;
-          resultText.textContent = '大凶';
-          resultText.classList.add('daikyo', 'fade-in');
-
-          // 大凶が出たらローカルストレージをリセット
-          daikichiStreak = 0;
-          localStorage.removeItem(LS_KEY_DAIKICHI_STREAK);
-
-        } else {
-          // 大吉
-          daikichiStreak++;
-          resultText.textContent = '大吉';
-          resultText.classList.add('daikichi', 'fade-in');
-          logMessage.textContent = ''; // 大凶メッセージは消しておく
-          // daikichiStreakを保存
-          localStorage.setItem(LS_KEY_DAIKICHI_STREAK, daikichiStreak.toString());
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RISKY DICE - HUNTER×HUNTER Style</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@700&family=Nosifer&family=RocknRoll+One&display=swap" rel="stylesheet">
+    
+    <style>
+        :root {
+            --neon-blue: #00f3ff;
+            --neon-purple: #bc13fe;
+            --danger-red: #ff003c;
+            --dark-bg: #050505;
+            --font-main: 'Cinzel', serif;
+            --font-jp: 'RocknRoll One', sans-serif;
+            --font-horror: 'Nosifer', cursive;
         }
 
-        // totalRollsを保存
-        localStorage.setItem(LS_KEY_TOTAL_ROLLS, totalRolls.toString());
+        body, html {
+            margin: 0;
+            padding: 0;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background-color: var(--dark-bg);
+            color: white;
+            font-family: var(--font-jp);
+            user-select: none;
+        }
 
-        updateStats();
-        rollButton.disabled = false;
-      });
-    }
+        /* 背景のキャンバス（念オーラ用） */
+        #aura-canvas {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 1;
+            opacity: 0.6;
+        }
 
-    // ----------------------------------
-    // ???を回転表示 → 消した後にコールバック
-    // ----------------------------------
-    function showQuestionSpin(callback) {
-      // 前の結果をフェードアウト
-      resultText.classList.add('fade-out');
+        /* メインUIコンテナ */
+        #ui-container {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 10;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
+            align-items: center;
+            padding: 20px;
+            box-sizing: border-box;
+            pointer-events: none; /* 3D操作のためにイベント透過 */
+        }
 
-      setTimeout(() => {
-        // 一度テキストやクラスを消去
-        resultText.textContent = '';
-        resultText.classList.remove('daikichi', 'daikyo', 'fade-out', 'fade-in');
+        /* カウンター */
+        .counter-wrapper {
+            margin-top: 40px;
+            text-align: center;
+            pointer-events: auto;
+        }
 
-        // ??? にして回転開始
-        resultText.textContent = "???";
-        resultText.classList.add('spin', 'fade-in');
+        .counter-label {
+            font-family: var(--font-main);
+            font-size: 1.2rem;
+            color: var(--neon-blue);
+            text-shadow: 0 0 10px var(--neon-blue);
+            letter-spacing: 2px;
+            text-transform: uppercase;
+        }
 
-        // 1秒後(回転アニメ完了)に???を消して、コールバックへ
-        setTimeout(() => {
-          // ??? をフェードアウト
-          resultText.classList.remove('fade-in');
-          resultText.classList.add('fade-out');
-          resultText.classList.remove('spin');
+        #streak-counter {
+            font-family: var(--font-main);
+            font-size: 5rem;
+            font-weight: bold;
+            color: #fff;
+            text-shadow: 0 0 20px var(--neon-purple);
+            line-height: 1;
+            transition: all 0.3s ease;
+        }
 
-          setTimeout(() => {
-            // ??? を空に
-            resultText.textContent = "";
-            resultText.classList.remove('fade-out');
-            // 結果表示へ
-            callback();
-          }, 300);
-        }, 1000);
-      }, 300); 
-    }
+        /* ダイス表示エリア（Three.js canvas用のプレースホルダー的役割） */
+        #canvas-container {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            z-index: 5;
+        }
 
-    // ----------------------------------
-    // 統計表示の更新
-    // ----------------------------------
-    function updateStats() {
-      statsArea.textContent = 
-        `累計: ${totalRolls}回 ／ 現在の大吉連続: ${daikichiStreak}回`;
-    }
+        /* 操作ボタン */
+        .controls {
+            margin-bottom: 60px;
+            pointer-events: auto;
+            text-align: center;
+        }
 
-    // ----------------------------------
-    // リセット処理（ローカルストレージもクリア）
-    // ----------------------------------
-    function resetStats() {
-      daikichiStreak = 0;
-      totalRolls     = 0;
-      localStorage.removeItem(LS_KEY_DAIKICHI_STREAK);
-      localStorage.removeItem(LS_KEY_TOTAL_ROLLS);
+        #roll-btn {
+            background: transparent;
+            border: 2px solid var(--neon-blue);
+            color: var(--neon-blue);
+            padding: 15px 40px;
+            font-size: 1.5rem;
+            font-family: var(--font-main);
+            font-weight: bold;
+            cursor: pointer;
+            position: relative;
+            overflow: hidden;
+            transition: all 0.3s;
+            box-shadow: 0 0 15px rgba(0, 243, 255, 0.3);
+            text-transform: uppercase;
+            letter-spacing: 3px;
+        }
 
-      resultText.textContent = '';
-      resultText.classList.remove('daikichi', 'daikyo', 'fade-out', 'fade-in', 'spin');
-      logMessage.textContent = '';
+        #roll-btn:hover {
+            background: var(--neon-blue);
+            color: var(--dark-bg);
+            box-shadow: 0 0 30px var(--neon-blue);
+        }
 
-      updateStats();
-    }
+        #roll-btn:disabled {
+            border-color: #555;
+            color: #555;
+            box-shadow: none;
+            cursor: not-allowed;
+        }
 
-    // ボタンのイベント
-    rollButton.addEventListener('click', rollRiskyDice);
-    resetButton.addEventListener('click', resetStats);
+        /* 結果表示オーバーレイ */
+        #result-overlay {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            text-align: center;
+            opacity: 0;
+            transition: opacity 0.3s;
+            pointer-events: none;
+            width: 100%;
+        }
 
-    // 初期表示
-    updateStats();
-  </script>
+        #result-text {
+            font-size: 4rem;
+            font-weight: bold;
+            text-shadow: 0 0 20px rgba(0,0,0,0.8);
+            white-space: nowrap;
+        }
+
+        .result-good {
+            color: #fff;
+            text-shadow: 0 0 20px var(--neon-blue), 0 0 40px var(--neon-purple);
+            animation: pulse-glow 1s infinite alternate;
+        }
+
+        .result-bad {
+            font-family: var(--font-horror);
+            color: var(--danger-red);
+            font-size: 6rem !important;
+            text-shadow: 5px 5px 0px #000, -2px -2px 10px #000;
+        }
+
+        .sub-text {
+            font-size: 1.2rem;
+            margin-top: 10px;
+            opacity: 0.9;
+        }
+
+        /* --- アニメーション & エフェクト --- */
+
+        @keyframes pulse-glow {
+            from { text-shadow: 0 0 10px var(--neon-blue); transform: scale(1); }
+            to { text-shadow: 0 0 30px var(--neon-blue), 0 0 50px white; transform: scale(1.05); }
+        }
+
+        /* シェイクエフェクト（大凶時） */
+        .shake-hard {
+            animation: shake 0.5s cubic-bezier(.36,.07,.19,.97) both infinite;
+            transform: translate3d(0, 0, 0);
+        }
+
+        @keyframes shake {
+            10%, 90% { transform: translate3d(-5px, 0, 0) rotate(-1deg); }
+            20%, 80% { transform: translate3d(10px, 0, 0) rotate(2deg); }
+            30%, 50%, 70% { transform: translate3d(-20px, 0, 0) rotate(-3deg); filter: hue-rotate(90deg); }
+            40%, 60% { transform: translate3d(20px, 0, 0) rotate(3deg); filter: invert(1); }
+        }
+
+        /* カウンター破壊エフェクト */
+        .shattered {
+            animation: shatter 0.8s forwards;
+            color: var(--danger-red) !important;
+            text-shadow: none !important;
+        }
+
+        @keyframes shatter {
+            0% { transform: scale(1); filter: blur(0); }
+            50% { transform: scale(1.5) rotate(10deg); filter: blur(2px); }
+            100% { transform: scale(0); opacity: 0; letter-spacing: 50px; }
+        }
+
+        /* グリッチノイズオーバーレイ */
+        #glitch-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: transparent;
+            z-index: 100;
+            pointer-events: none;
+            display: none;
+        }
+        
+        .glitch-active {
+            display: block !important;
+            background: rgba(255, 0, 0, 0.1);
+        }
+        
+        .glitch-active::before {
+            content: "";
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 10px;
+            background: rgba(255, 255, 255, 0.5);
+            animation: scanline 2s linear infinite;
+            opacity: 0.5;
+        }
+
+        @keyframes scanline {
+            0% { top: -10%; }
+            100% { top: 110%; }
+        }
+
+    </style>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+</head>
+<body>
+
+    <canvas id="aura-canvas"></canvas>
+
+    <div id="canvas-container"></div>
+
+    <div id="glitch-overlay"></div>
+
+    <div id="ui-container">
+        <div class="counter-wrapper">
+            <div class="counter-label">Consecutive Success</div>
+            <div id="streak-counter">0</div>
+        </div>
+
+        <div id="result-overlay">
+            <div id="result-text"></div>
+            <div id="sub-text" class="sub-text"></div>
+        </div>
+
+        <div class="controls">
+            <button id="roll-btn">ROLL THE DIE</button>
+        </div>
+    </div>
+
+    <script>
+        /**
+         * 1. 3D SCENE SETUP (Three.js)
+         */
+        const container = document.getElementById('canvas-container');
+        const scene = new THREE.Scene();
+        // フォグを追加して奥行き感を出す
+        scene.fog = new THREE.FogExp2(0x050505, 0.05);
+
+        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
+        camera.position.z = 5;
+
+        const renderer = new THREE.WebGLRenderer({ alpha: true, antialias: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(window.devicePixelRatio);
+        container.appendChild(renderer.domElement);
+
+        // ライティング
+        const ambientLight = new THREE.AmbientLight(0x404040, 2);
+        scene.add(ambientLight);
+
+        const pointLight1 = new THREE.PointLight(0x00f3ff, 2, 50); // Neon Blue
+        pointLight1.position.set(5, 5, 5);
+        scene.add(pointLight1);
+
+        const pointLight2 = new THREE.PointLight(0xbc13fe, 2, 50); // Neon Purple
+        pointLight2.position.set(-5, -5, 5);
+        scene.add(pointLight2);
+
+        // ダイスの作成 (二十面体)
+        const geometry = new THREE.IcosahedronGeometry(1.8, 0);
+        const material = new THREE.MeshStandardMaterial({ 
+            color: 0x111111,
+            metalness: 0.9,
+            roughness: 0.2,
+            emissive: 0x001133,
+            emissiveIntensity: 0.2,
+            flatShading: true
+        });
+        
+        // ワイヤーフレームを重ねてサイバー感を出す
+        const wireGeo = new THREE.IcosahedronGeometry(1.805, 0);
+        const wireMat = new THREE.MeshBasicMaterial({ color: 0x00f3ff, wireframe: true, transparent: true, opacity: 0.3 });
+        const wireMesh = new THREE.Mesh(wireGeo, wireMat);
+
+        const dice = new THREE.Mesh(geometry, material);
+        dice.add(wireMesh); // 本体にワイヤーフレームを追加
+        scene.add(dice);
+
+        // レスポンシブ対応
+        window.addEventListener('resize', () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+
+        // アニメーションループ
+        let isRolling = false;
+        const clock = new THREE.Clock();
+
+        function animate() {
+            requestAnimationFrame(animate);
+
+            if (isRolling) {
+                // 回転中：ランダムに高速回転
+                dice.rotation.x += 0.2;
+                dice.rotation.y += 0.3;
+                dice.rotation.z += 0.1;
+                
+                // ワイヤーフレームを少しずらして回転させるとカッコいい
+                wireMesh.rotation.x -= 0.05;
+            } else {
+                // 待機中：ゆっくり浮遊回転
+                const time = clock.getElapsedTime();
+                dice.rotation.x = Math.sin(time * 0.5) * 0.5;
+                dice.rotation.y = time * 0.2;
+                dice.position.y = Math.sin(time) * 0.2;
+            }
+
+            renderer.render(scene, camera);
+        }
+        animate();
+
+        /**
+         * 2. GAME LOGIC & UI
+         */
+        const rollBtn = document.getElementById('roll-btn');
+        const streakCounter = document.getElementById('streak-counter');
+        const resultOverlay = document.getElementById('result-overlay');
+        const resultText = document.getElementById('result-text');
+        const subText = document.getElementById('sub-text');
+        const glitchOverlay = document.getElementById('glitch-overlay');
+        const body = document.body;
+
+        let streak = 0;
+        let audioContext = null;
+
+        // 音声初期化（ユーザー操作が必要）
+        function initAudio() {
+            if (!audioContext) {
+                audioContext = new (window.AudioContext || window.webkitAudioContext)();
+            }
+            if (audioContext.state === 'suspended') {
+                audioContext.resume();
+            }
+        }
+
+        // シンセサイザー音生成
+        function playSound(type) {
+            if (!audioContext) return;
+            const osc = audioContext.createOscillator();
+            const gain = audioContext.createGain();
+            osc.connect(gain);
+            gain.connect(audioContext.destination);
+
+            const now = audioContext.currentTime;
+
+            if (type === 'spin') {
+                // 回転音：低いノイズのような音
+                osc.type = 'sawtooth';
+                osc.frequency.setValueAtTime(50, now);
+                osc.frequency.exponentialRampToValueAtTime(100, now + 0.1);
+                gain.gain.setValueAtTime(0.1, now);
+                gain.gain.exponentialRampToValueAtTime(0.01, now + 0.1);
+                osc.start(now);
+                osc.stop(now + 0.1);
+            } else if (type === 'win') {
+                // 大吉：キラキラした高音
+                osc.type = 'sine';
+                osc.frequency.setValueAtTime(880, now); // A5
+                osc.frequency.exponentialRampToValueAtTime(1760, now + 0.5); // A6
+                gain.gain.setValueAtTime(0.5, now);
+                gain.gain.exponentialRampToValueAtTime(0.01, now + 1.5);
+                osc.start(now);
+                osc.stop(now + 1.5);
+                
+                // 和音用にもう一つ
+                const osc2 = audioContext.createOscillator();
+                const gain2 = audioContext.createGain();
+                osc2.connect(gain2);
+                gain2.connect(audioContext.destination);
+                osc2.type = 'triangle';
+                osc2.frequency.setValueAtTime(554, now); // C#5
+                gain2.gain.setValueAtTime(0.3, now);
+                gain2.gain.exponentialRampToValueAtTime(0.01, now + 1.5);
+                osc2.start(now);
+                osc2.stop(now + 1.5);
+
+            } else if (type === 'loss') {
+                // 大凶：不協和音と重低音
+                osc.type = 'sawtooth';
+                osc.frequency.setValueAtTime(100, now);
+                osc.frequency.linearRampToValueAtTime(30, now + 2); // Pitch down
+                gain.gain.setValueAtTime(0.8, now);
+                gain.gain.linearRampToValueAtTime(0, now + 2);
+                osc.start(now);
+                osc.stop(now + 2);
+
+                // ノイズ的要素
+                const osc3 = audioContext.createOscillator();
+                const gain3 = audioContext.createGain();
+                osc3.connect(gain3);
+                gain3.connect(audioContext.destination);
+                osc3.type = 'square';
+                osc3.frequency.setValueAtTime(50, now); // 不協和音
+                // ビブラート的な揺れ
+                osc3.frequency.setValueAtTime(50, now); 
+                gain3.gain.setValueAtTime(0.5, now);
+                gain3.gain.exponentialRampToValueAtTime(0.01, now + 2);
+                osc3.start(now);
+                osc3.stop(now + 2);
+            }
+        }
+
+        rollBtn.addEventListener('click', async () => {
+            initAudio();
+            if (isRolling) return;
+
+            // UI リセット
+            resultOverlay.style.opacity = '0';
+            resultText.className = '';
+            rollBtn.disabled = true;
+            rollBtn.innerText = "ROLLING...";
+            
+            // 回転開始
+            isRolling = true;
+            
+            // 回転音ループ（簡易）
+            const spinInterval = setInterval(() => playSound('spin'), 100);
+
+            // 演出のため少し待つ
+            await new Promise(r => setTimeout(r, 1500));
+            
+            clearInterval(spinInterval);
+            isRolling = false;
+            
+            // 判定 (1/20 = 0.05)
+            const isCriticalFailure = Math.random() < 0.05;
+            // デバッグ用（コメントアウトを外すと50%で大凶）
+            // const isCriticalFailure = Math.random() < 0.5;
+
+            // 結果表示
+            resultOverlay.style.opacity = '1';
+
+            if (!isCriticalFailure) {
+                // --- 大吉（あたり） ---
+                streak++;
+                streakCounter.innerText = streak;
+                
+                playSound('win');
+                
+                resultText.innerText = "大 吉";
+                resultText.className = "result-good";
+                subText.innerText = "DEFENSE UP! CONTINUE?";
+                subText.style.color = "var(--neon-blue)";
+                
+                // ダイスの色を青く光らせる
+                material.emissive.setHex(0x00f3ff);
+                material.emissiveIntensity = 1;
+                
+                setTimeout(() => {
+                    material.emissiveIntensity = 0.2;
+                    material.emissive.setHex(0x001133);
+                }, 500);
+
+                rollBtn.disabled = false;
+                rollBtn.innerText = "ROLL AGAIN";
+
+            } else {
+                // --- 大凶（ハズレ） ---
+                playSound('loss');
+                
+                // 1. テキスト表示
+                resultText.innerText = "大 凶";
+                resultText.className = "result-bad";
+                subText.innerText = "GAME OVER";
+                subText.style.color = "var(--danger-red)";
+
+                // 2. ダイスを赤く
+                material.emissive.setHex(0xff0000);
+                material.emissiveIntensity = 2;
+
+                // 3. 絶望演出開始
+                body.classList.add('shake-hard');
+                glitchOverlay.classList.add('glitch-active');
+                
+                // カウンター破壊
+                streakCounter.classList.add('shattered');
+
+                // 4. 背景オーラを赤黒く
+                auraColor = {r: 255, g: 0, b: 0}; 
+
+                // 5. リセット処理（遅延）
+                setTimeout(() => {
+                    body.classList.remove('shake-hard');
+                    glitchOverlay.classList.remove('glitch-active');
+                    
+                    // カウンターリセット
+                    streak = 0;
+                    streakCounter.innerText = "0";
+                    streakCounter.classList.remove('shattered');
+                    
+                    // 色戻し
+                    material.emissive.setHex(0x001133);
+                    material.emissiveIntensity = 0.2;
+                    auraColor = {r: 100, g: 0, b: 255}; // 紫に戻す
+
+                    rollBtn.disabled = false;
+                    rollBtn.innerText = "RESTART";
+                    
+                    resultOverlay.style.opacity = '0';
+                }, 3500); // 絶望の時間は3.5秒
+            }
+        });
+
+        /**
+         * 3. BACKGROUND AURA (Canvas 2D)
+         * 「念」のようなゆらぎ表現
+         */
+        const auraCanvas = document.getElementById('aura-canvas');
+        const ctx = auraCanvas.getContext('2d');
+        let auraParticles = [];
+        let auraColor = {r: 100, g: 0, b: 255}; // 初期は紫
+
+        function resizeAura() {
+            auraCanvas.width = window.innerWidth;
+            auraCanvas.height = window.innerHeight;
+        }
+        window.addEventListener('resize', resizeAura);
+        resizeAura();
+
+        class Particle {
+            constructor() {
+                this.x = Math.random() * auraCanvas.width;
+                this.y = Math.random() * auraCanvas.height;
+                this.vx = (Math.random() - 0.5) * 1;
+                this.vy = (Math.random() - 0.5) * 1;
+                this.size = Math.random() * 100 + 50;
+                this.life = Math.random() * 0.5 + 0.5;
+            }
+            update() {
+                this.x += this.vx;
+                this.y += this.vy;
+                this.life -= 0.005;
+                if (this.life <= 0) {
+                    this.x = Math.random() * auraCanvas.width;
+                    this.y = Math.random() * auraCanvas.height;
+                    this.life = 1;
+                }
+            }
+            draw() {
+                const gradient = ctx.createRadialGradient(this.x, this.y, 0, this.x, this.y, this.size);
+                gradient.addColorStop(0, `rgba(${auraColor.r}, ${auraColor.g}, ${auraColor.b}, ${this.life * 0.1})`);
+                gradient.addColorStop(1, 'rgba(0,0,0,0)');
+                ctx.fillStyle = gradient;
+                ctx.beginPath();
+                ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+                ctx.fill();
+            }
+        }
+
+        for (let i = 0; i < 30; i++) {
+            auraParticles.push(new Particle());
+        }
+
+        function animateAura() {
+            ctx.clearRect(0, 0, auraCanvas.width, auraCanvas.height);
+            // 合成モードを変えて怪しい雰囲気に
+            ctx.globalCompositeOperation = 'lighter';
+            
+            auraParticles.forEach(p => {
+                p.update();
+                p.draw();
+            });
+            requestAnimationFrame(animateAura);
+        }
+        animateAura();
+
+    </script>
 </body>
 </html>
